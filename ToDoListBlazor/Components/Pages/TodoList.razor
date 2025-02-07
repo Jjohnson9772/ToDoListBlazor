@@ -1,0 +1,58 @@
+﻿@page "/TodoList"
+@attribute [StreamRendering]
+@using TodoService;
+@using TodoRepository;
+@using Microsoft.Extensions.Configuration;
+@inject IConfiguration configuration
+
+<PageTitle>TodoList</PageTitle>
+
+<h1>TodoList</h1>
+
+<p>This component demonstrates showing data.</p>
+
+@if (TodoTasks == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Item</th>
+                <th>Completed</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var TodoTask in TodoTasks)
+            {
+                <tr>
+                    <td></td>
+                    <td>@TodoTask.Name</td>
+                    <td>@TodoTask.Completed</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+
+    private List<TodoTask>? TodoTasks;
+
+    private Microsoft.Extensions.Configuration.IConfiguration mConfiguration;
+    private TodoTaskRepository mRepository;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        mConfiguration = configuration;
+        mRepository = new TodoTaskRepository(configuration.GetConnectionString("Portfolio"));
+
+        await Task.Delay(500);
+        TodoTasks = mRepository.Select();
+    }
+}
