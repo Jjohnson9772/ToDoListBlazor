@@ -1,58 +1,176 @@
-﻿@page "/TodoList"
-@attribute [StreamRendering]
+﻿@page "/"
+@rendermode InteractiveServer
+@inject IJSRuntime JS
 @using TodoService;
 @using TodoRepository;
 @using Microsoft.Extensions.Configuration;
-@inject IConfiguration configuration
+@inject IConfiguration configuration;
+
+@* importing leaflet for use of map *@
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+@namespace BlazorApp.Pages
 
 <PageTitle>TodoList</PageTitle>
 
-<h1>TodoList</h1>
+<h1>To Do List</h1>
+@* defining the flex container allows for side by side css styling of table and the map *@
+<div class="flex-container"> 
+    <div id="Left">
+        <div class="row">
+            <div class="col-auto">
+                <select id="CompletionFilter" class="form-control" @onchange="SelectFilteredTasks">
+                    <option value=1>All Tasks</option>
+                    <option value=2>Pending</option>
+                    <option value=3>Completed</option>
+                </select>
+            </div>
 
-<p>This component demonstrates showing data.</p>
+            <div class="col-auto">
+                <button @onclick="AddRowFromBlazor" class="btn btn-secondary">Add Task</button>
+            </div>
 
-@if (TodoTasks == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th></th>
-                <th>Item</th>
-                <th>Completed</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var TodoTask in TodoTasks)
-            {
-                <tr>
-                    <td></td>
-                    <td>@TodoTask.Name</td>
-                    <td>@TodoTask.Completed</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+            <div class="col-auto">
+                <button class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#TaskTable">
+                    <i class="bi bi-dash-lg"></i> 
+                </button>
+            </div>
+        </div>
+        <br>
+
+        @if (TodoTasks == null)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else
+        {            
+            <table id="TaskTable" class="collapse show">
+                <thead>
+                    <tr>
+                        <th>Task</th>
+                        <th>Completed</th>
+                        <th>Removal</th>
+                        <th>Location</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var TodoTask in TodoTasks)
+                    {
+                        <tr @ref="rowElement" class="@TodoTask.Class" data-id="@TodoTask.ItemID">
+                            <td>
+                                <input type="text" @bind="TodoTask.Name" @onblur="() => SaveTask(TodoTask)" class="form-control" />
+                            </td>
+                            <td>
+                                <input type="checkbox" class="CompleteCheck" @bind="TodoTask.Completed" @onclick="() => ToggleCompleted(TodoTask)"/>
+                            </td>
+                            <td>
+                                <button class="GridButton" @onclick="() => DeleteTask(TodoTask)">Delete</button>
+                            </td>
+                            <td>
+                                <button class="GridButton" @onclick="() => LocateTask(TodoTask)">Find</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+    @* map is its own element before js leaflet expands on it *@
+    <div id="map"></div>
+    <br /><br />
+</div>
+
+<p>Using the Map</p>
+<p> 1. Click find on a task item to see its map location</p>
+<p> 2. Drag the marker to set its new coordinates</p>
+<p> 3. The coordinates are now saved </p>
 
 @code {
+    ElementReference rowElement;
+    private string SelectedOption { get; set; }
 
     private List<TodoTask>? TodoTasks;
 
     private Microsoft.Extensions.Configuration.IConfiguration mConfiguration;
     private TodoTaskRepository mRepository;
 
+    private Dictionary<TodoTask, ElementReference> RowReferences = new();
+
+    //reference for quickly accessing js functions
+    private IJSObjectReference? module;
+
+    protected async override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            module = await JS.InvokeAsync<IJSObjectReference>("import",
+                "./Components/Pages/TodoList.razor.js");
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
-
         mConfiguration = configuration;
         mRepository = new TodoTaskRepository(configuration.GetConnectionString("Portfolio"));
 
         await Task.Delay(500);
         TodoTasks = mRepository.Select();
+    }
+
+    //filtering handles by result of drop menu
+    public async Task SelectFilteredTasks(ChangeEventArgs e){
+
+        var x = e.Value;
+
+        switch (x) {
+
+            case "1":
+                TodoTasks = mRepository.Select();
+                break;
+            case "2":
+                TodoTasks = mRepository.SelectFiltered(false);
+                break;
+            case "3":
+                TodoTasks = mRepository.SelectFiltered(true);
+                break;        
+        }  
+    }
+
+    //append a new element to the razor table
+    public void AddRowFromBlazor()
+    {
+        TodoTasks.Add(new TodoTask { ItemID = -1, Name = "", Completed = false, Class = "new-row" });
+        StateHasChanged();
+    }
+
+    private void ToggleCompleted(TodoTask task)
+    {
+        task.Completed = !task.Completed;
+        SaveTask(task);
+    }
+
+    private async Task SaveTask(TodoTask task)
+    {
+        //reload grid if new item
+        mRepository.Save(task);
+        await Task.Delay(1500);
+        TodoTasks = mRepository.Select();
+        StateHasChanged();
+    }
+
+    public async Task DeleteTask(TodoTask task)
+    {
+        await module.InvokeVoidAsync("deleteWithAnimation", task.ItemID);
+        await Task.Delay(1500);
+        mRepository.Delete(task.ItemID); 
+        StateHasChanged();
+    }
+
+    public async Task LocateTask(TodoTask task)
+    {
+        //this goes to leaflet map and provides coordinates for a marker
+        await module.InvokeVoidAsync("renderTaskMarker", task);        
+        StateHasChanged();
     }
 }

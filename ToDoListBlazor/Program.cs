@@ -2,11 +2,17 @@ using ToDoListBlazor.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddControllers();
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
+
+
+app.UseRouting();
+app.MapControllers(); 
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
