@@ -16,21 +16,21 @@ namespace TodoRepository
             ConnectionString = connectionString;
         }
 
-        public List<TodoTask> SelectFiltered(bool Completed)
+        public async Task<List<TodoTask>> SelectFiltered(bool Completed)
         {
             List<TodoTask> items = new List<TodoTask>();
 
             using (var sqlConnection = new SqlConnection(ConnectionString))
             {
-                sqlConnection.Open();
+                await sqlConnection.OpenAsync();
                 using (var sqlCommand = new SqlCommand("[dbo].[SelectFilteredItems]", sqlConnection))
                 {
                     sqlCommand.CommandType = CommandType.StoredProcedure;
                     sqlCommand.Parameters.Add(new SqlParameter("Completed", Completed));
 
-                    using (SqlDataReader dataReader = sqlCommand.ExecuteReader())
+                    using (SqlDataReader dataReader = await sqlCommand.ExecuteReaderAsync())
                     {
-                        while (dataReader.Read())
+                        while (await dataReader.ReadAsync())
                         {
                             var item = new TodoTask
                             {
@@ -48,19 +48,19 @@ namespace TodoRepository
             return items;
         }
 
-        public List<TodoTask> Select()
+        public async Task<List<TodoTask>> Select()
         {
             List<TodoTask> items = new List<TodoTask>();
 
             using (var sqlConnection = new SqlConnection(ConnectionString))
             {
-                sqlConnection.Open();
+                await sqlConnection.OpenAsync();
                 using (var sqlCommand = new SqlCommand("[dbo].[SelectAllItems]", sqlConnection))
                 {
                     sqlCommand.CommandType = CommandType.StoredProcedure;
-                    using (SqlDataReader dataReader = sqlCommand.ExecuteReader())
+                    using (SqlDataReader dataReader = await sqlCommand.ExecuteReaderAsync())
                     {
-                        while (dataReader.Read())
+                        while (await dataReader.ReadAsync())
                         {
                             var item = new TodoTask
                             {
@@ -78,11 +78,11 @@ namespace TodoRepository
             return items;
         }
 
-        public void Save(TodoTask task)
+        public async Task<bool> Save(TodoTask task)
         {
             using (var sqlConnection = new SqlConnection(ConnectionString))
             {
-                sqlConnection.Open();
+                await sqlConnection.OpenAsync();
                 using (var sqlCommand = new SqlCommand("[dbo].[UpsertItem]", sqlConnection))
                 {
                     sqlCommand.CommandType = CommandType.StoredProcedure;
@@ -91,26 +91,28 @@ namespace TodoRepository
                     sqlCommand.Parameters.Add(new SqlParameter("@Name", task.Name));
                     sqlCommand.Parameters.Add(new SqlParameter("@Completed", task.Completed));
 
-                    sqlCommand.ExecuteNonQuery();
+                    await sqlCommand.ExecuteNonQueryAsync();
                     
                 }
+                return true;
             }
         }
 
-        public void Delete(int itemID) {
+        public async Task<bool> Delete(int itemID) {
             using (var sqlConnection = new SqlConnection(ConnectionString))
             {
-                sqlConnection.Open();
+                await sqlConnection.OpenAsync();
                 using (var sqlCommand = new SqlCommand("[dbo].[DeleteItem]", sqlConnection))
                 {
                     sqlCommand.CommandType = CommandType.StoredProcedure;
 
                     sqlCommand.Parameters.Add(new SqlParameter("@ItemID", itemID));
 
-                    sqlCommand.ExecuteNonQuery();
+                    await sqlCommand.ExecuteNonQueryAsync();
 
                 }
             }
+            return true;
         }
 
         public void SaveTaskMarker(int itemID, double lat, double lng)

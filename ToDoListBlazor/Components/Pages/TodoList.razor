@@ -114,8 +114,7 @@
         mConfiguration = configuration;
         mRepository = new TodoTaskRepository(configuration.GetConnectionString("Portfolio"));
 
-        await Task.Delay(500);
-        TodoTasks = mRepository.Select();
+        TodoTasks = await mRepository.Select();
     }
 
     //filtering handles by result of drop menu
@@ -126,44 +125,42 @@
         switch (x) {
 
             case "1":
-                TodoTasks = mRepository.Select();
+                TodoTasks = await mRepository.Select();
                 break;
             case "2":
-                TodoTasks = mRepository.SelectFiltered(false);
+                TodoTasks = await mRepository.SelectFiltered(false);
                 break;
             case "3":
-                TodoTasks = mRepository.SelectFiltered(true);
+                TodoTasks = await mRepository.SelectFiltered(true);
                 break;        
         }  
     }
 
-    //append a new element to the razor table
     public void AddRowFromBlazor()
     {
+        //appends a new element to the table
         TodoTasks.Add(new TodoTask { ItemID = -1, Name = "", Completed = false, Class = "new-row" });
         StateHasChanged();
     }
 
-    private void ToggleCompleted(TodoTask task)
+    private async void ToggleCompleted(TodoTask task)
     {
         task.Completed = !task.Completed;
-        SaveTask(task);
+        await SaveTask(task);
     }
 
     private async Task SaveTask(TodoTask task)
     {
         //reload grid if new item
-        mRepository.Save(task);
-        await Task.Delay(1500);
-        TodoTasks = mRepository.Select();
+        await mRepository.Save(task);
+        TodoTasks = await mRepository.Select();
         StateHasChanged();
     }
 
     public async Task DeleteTask(TodoTask task)
     {
         await module.InvokeVoidAsync("deleteWithAnimation", task.ItemID);
-        await Task.Delay(1500);
-        mRepository.Delete(task.ItemID); 
+        await mRepository.Delete(task.ItemID); 
         StateHasChanged();
     }
 
